@@ -23,17 +23,19 @@ It invites and accepts the invite for each Member account.
 import boto3
 import sys
 import time
+from collections import OrderedDict
 
 # Global Variables
 # :global aws_account_dict: Dictionary of AWS Accounts to enable GuardDuty in format AWS_Account_Number:Email_Address
 # :global master_aws_account_number: GuardDuty Master Account, must be first in aws_account_list
 # :global cloudformation_exec_role: Role to assume in accounts listed in aws_acount_list
 # :global gd_invite_message: Message sent to Member accounts when invited to join GuardDuty Master
-aws_account_dict = {
-    '111111111111': 'me@example.com',
-    '222222222222': 'you@example.com',
-    '333333333333': 'someoneelse@example.com'
-}
+aws_account_dict = OrderedDict()
+
+aws_account_dict['111111111111'] = 'me@example.com'
+aws_account_dict['222222222222'] = 'you@example.com'
+aws_account_dict['333333333333'] = 'someoneelse@example.com'
+
 master_aws_account_number = '111111111111'
 cloudformation_exec_role = 'AWSCloudFormationStackSetExecutionRole'
 gd_invite_message = 'Account {account} invites you to join GuardDuty.'.format(account=master_aws_account_number)
