@@ -50,26 +50,25 @@ def main():
         for aws_region in aws_region_list:
             gd_client = assume_role(account_str, cloudformation_exec_role, aws_region)
 
-            if aws_region != 'eu-west-3':
 
-                detector_dict = list_detectors(gd_client, aws_region)
+            detector_dict = list_detectors(gd_client, aws_region)
 
-                detector_id = detector_dict[aws_region]
+            detector_id = detector_dict[aws_region]
 
-                if detector_id != '':
-                    print('GuardDuty is active in {region}'.format(region=aws_region))
+            if detector_id != '':
+                print('GuardDuty is active in {region}'.format(region=aws_region))
 
-                if account_counter == 0 and detector_id != '':
-                    member_dict = list_members(gd_client, detector_id)
-                    if member_dict:
-                        print('There are members in {region}'.format(region=aws_region))
-                        delete_members(gd_client, detector_id, account_str, aws_region)
+            if account_counter == 0 and detector_id != '':
+                member_dict = list_members(gd_client, detector_id)
+                if member_dict:
+                    print('There are members in {region}'.format(region=aws_region))
+                    delete_members(gd_client, detector_id, account_str, aws_region)
 
-                if detector_id != '':
-                    delete_detector(gd_client, detector_id)
-                    print('Deleted {detector} for {account} in {region}.'.format(detector=detector_id,account=account_str,region=aws_region))
-                else:
-                    print('No detector found for {account} in {region}'.format(account=account_str,region=aws_region))
+            if detector_id != '':
+                delete_detector(gd_client, detector_id)
+                print('Deleted {detector} for {account} in {region}.'.format(detector=detector_id,account=account_str,region=aws_region))
+            else:
+                print('No detector found for {account} in {region}'.format(account=account_str,region=aws_region))
 
         account_counter += 1
 
