@@ -24,7 +24,7 @@ from collections import OrderedDict
 
 # Global Variables
 #:global aws_account_list: List of AWS Accounts to disable GuardDuty
-#:global master_aws_account_number: GuardDuty Master Account, must be first in aws_account_list
+# GuardDuty Master Account, must be first in aws_account_list
 #:global cloudformation_exec_role: Role to assume in accounts listed in aws_acount_list
 aws_account_dict = OrderedDict()
 
@@ -44,32 +44,40 @@ def main():
 
     account_counter = 0
 
-    for account_str in aws_account_list:
+    for account_str, account_email in aws_account_dict.items():
         aws_region_list = get_region_list()
 
         for aws_region in aws_region_list:
             gd_client = assume_role(account_str, cloudformation_exec_role, aws_region)
 
-            if aws_region != 'eu-west-3':
+            detector_dict = list_detectors(gd_client, aws_region)
 
-                detector_dict = list_detectors(gd_client, aws_region)
+            detector_id = detector_dict[aws_region]
 
-                detector_id = detector_dict[aws_region]
+            if detector_id != '':
+                print('GuardDuty is active in {region}'.format(region=aws_region))
 
-                if detector_id != '':
-                    print('GuardDuty is active in {region}'.format(region=aws_region))
+            if account_counter == 0 and detector_id != '':
+                if account_str != master_aws_account_number:
+                    # The Master GuardDuty Account was not the first account in the list
+                    sys.exit(
+                        'The Master GuardDuty Account must be the first account in aws_account_dict.  '
+                        'Please correct and retry.')
+                member_dict = list_members(gd_client, detector_id)
+                if member_dict:
+                    print('There are members in {region}'.format(region=aws_region))
+                    member_account_ids = [member_account_id for member_account_id, member_relationship_status in member_dict.items()
+                    if member_relationship_status == 'Enabled' or member_relationship_status == 'Disabled']
 
-                if account_counter == 0 and detector_id != '':
-                    member_dict = list_members(gd_client, detector_id)
-                    if member_dict:
-                        print('There are members in {region}'.format(region=aws_region))
-                        delete_members(gd_client, detector_id, account_str, aws_region)
+                    disassociate_members(gd_client, detector_id, member_account_ids, account_str, aws_region)
 
-                if detector_id != '':
-                    delete_detector(gd_client, detector_id)
-                    print('Deleted {detector} for {account} in {region}.'.format(detector=detector_id,account=account_str,region=aws_region))
-                else:
-                    print('No detector found for {account} in {region}'.format(account=account_str,region=aws_region))
+                    delete_members(gd_client, detector_id, member_dict.keys(), account_str, aws_region)
+
+            if detector_id != '':
+                delete_detector(gd_client, detector_id)
+                print('Deleted {detector} for {account} in {region}.'.format(detector=detector_id,account=account_str,region=aws_region))
+            else:
+                print('No detector found for {account} in {region}'.format(account=account_str,region=aws_region))
 
         account_counter += 1
 
@@ -80,14 +88,21 @@ def delete_detector(client, detector_id):
     )
 
 
-def delete_members(client, detector_id, account, aws_region):
+def delete_members(client, detector_id, account_ids, master_account, aws_region):
     response = client.delete_members(
         DetectorId=detector_id,
-        AccountIds=aws_account_list
+        AccountIds=account_ids
     )
 
-    print('Deleted members for {account} in {region}'.format(account=account, region=aws_region))
+    print('Deleted members for {account} in {region}'.format(account=master_account, region=aws_region))
 
+def disassociate_members(client, detector_id, account_ids, master_account, aws_region):
+    response = client.disassociate_members(
+        DetectorId=detector_id,
+        AccountIds=account_ids
+    )
+
+    print('Disassociated members for {account} in {region}'.format(account=master_account, region=aws_region))
 
 def list_detectors(client, aws_region):
     """
@@ -136,7 +151,7 @@ def assume_role(aws_account_number, role_name, aws_region):
     sts_client = boto3.client('sts')
     response = sts_client.assume_role(
         RoleArn='arn:aws:iam::' + aws_account_number + ':role/' + role_name,
-        RoleSessionName='EnableGuardDuty'
+        RoleSessionName='DisableGuardDuty'
     )
     # Storing STS credentials
     session = boto3.Session(
@@ -155,18 +170,12 @@ def assume_role(aws_account_number, role_name, aws_region):
 
 def get_region_list():
     """
-    Returns a list of valid AWS regions
+    Returns a list of valid AWS regions GuardDuty is launched in.
     :return: list of AWS regions
     """
-    ec2_client = boto3.client('ec2')
-
-    # Retrieves all regions that work with EC2
-    response = ec2_client.describe_regions()
-
-    region_list = list()
-
-    for region in response['Regions']:
-        region_list.append(region['RegionName'])
+    region_list = list(['ap-south-1', 'ap-northeast-2', 'ap-southeast-1', 'ap-southeast-2',
+        'ap-northeast-1', 'ca-central-1', 'eu-central-1', 'eu-west-1', 'eu-west-2',
+        'eu-west-3', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'sa-east-1'])
 
     return region_list
 

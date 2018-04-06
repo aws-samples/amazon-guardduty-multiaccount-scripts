@@ -191,18 +191,12 @@ def get_invitation_id(client, account):
 
 def get_region_list():
     """
-    Returns a list of valid AWS regions
+    Returns a list of valid AWS regions GuardDuty is launched in.
     :return: list of AWS regions
     """
-    ec2_client = boto3.client('ec2')
-
-    # Retrieves all regions that work with EC2
-    response = ec2_client.describe_regions()
-
-    region_list = list()
-
-    for region in response['Regions']:
-        region_list.append(region['RegionName'])
+    region_list = list(['ap-south-1', 'ap-northeast-2', 'ap-southeast-1', 'ap-southeast-2',
+        'ap-northeast-1', 'ca-central-1', 'eu-central-1', 'eu-west-1', 'eu-west-2',
+        'eu-west-3', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'sa-east-1'])
 
     return region_list
 
@@ -290,27 +284,23 @@ def master_guardduty_handler():
 
     for aws_region in aws_regions_list:
 
-        # Paris Region just launched and GuardDuty is not yet available.
-        if aws_region != 'eu-west-3':
-            gd_client = assume_role(master_aws_account_number, cloudformation_exec_role, aws_region)
-            # get detectors for this region
-            detector_dict = list_detectors(gd_client, aws_region)
+        gd_client = assume_role(master_aws_account_number, cloudformation_exec_role, aws_region)
+        # get detectors for this region
+        detector_dict = list_detectors(gd_client, aws_region)
 
-            if detector_dict[aws_region]:
-                # a detector exists
-                print('Found existing detector {detector} in {region} for {account}'.format(
-                    detector=detector_dict[aws_region], region=aws_region, account=master_aws_account_number
-                ))
-                master_detector_id_dict.update({aws_region: detector_dict[aws_region]})
-            else:
-                # create a detector
-                detector_str = create_detector(gd_client)
-                print('Created detector {detector} in {region} for {account}'.format(
-                    detector=detector_str, region=aws_region, account=master_aws_account_number
-                ))
-                master_detector_id_dict.update({aws_region: detector_str})
+        if detector_dict[aws_region]:
+            # a detector exists
+            print('Found existing detector {detector} in {region} for {account}'.format(
+                detector=detector_dict[aws_region], region=aws_region, account=master_aws_account_number
+            ))
+            master_detector_id_dict.update({aws_region: detector_dict[aws_region]})
         else:
-            print('Region is eu-west-3.  Skipping region.')
+            # create a detector
+            detector_str = create_detector(gd_client)
+            print('Created detector {detector} in {region} for {account}'.format(
+                detector=detector_str, region=aws_region, account=master_aws_account_number
+            ))
+            master_detector_id_dict.update({aws_region: detector_str})
 
     return master_detector_id_dict
 
@@ -329,66 +319,62 @@ def monitored_guardduty_handler(account, master_detector_id_dict):
     aws_regions_list = get_region_list()
 
     for aws_region in aws_regions_list:
-        # Paris Region just launched and GuardDuty is not yet available.
-        if aws_region != 'eu-west-3':
-            print('Beginning {account} in {region}'.format(account=account, region=aws_region))
-            gd_client = assume_role(account, cloudformation_exec_role, aws_region)
-            # get detectors for this region
-            detector_dict = list_detectors(gd_client, aws_region)
-            detector_id = detector_dict[aws_region]
+        print('Beginning {account} in {region}'.format(account=account, region=aws_region))
+        gd_client = assume_role(account, cloudformation_exec_role, aws_region)
+        # get detectors for this region
+        detector_dict = list_detectors(gd_client, aws_region)
+        detector_id = detector_dict[aws_region]
 
-            # If detector does not exist, create it
-            if detector_id:
-                # a detector exists
-                print('Found existing detector {detector} in {region} for {account}'.format(
-                    detector=detector_id, region=aws_region, account=account
-                ))
-            else:
-                # create a detector
-                detector_str = create_detector(gd_client)
-                print('Created detector {detector} in {region} for {account}'.format(
-                    detector=detector_str, region=aws_region, account=account
-                ))
-                detector_id = detector_str
-
-            master_detector_id = master_detector_id_dict[aws_region]
-            member_dict = get_master_members(aws_region, master_detector_id)
-            # If detector is not a member of the GuardDuty master account, add it
-            if account not in member_dict:
-                add_member(account, aws_region, master_detector_id)
-                # not sure this is the best logic
-                # repopulating member_dict now that we added the account as a member otherwise logic below is blown
-                # waiting because it takes some time before the member shows up in the list
-                while account not in member_dict:
-                    time.sleep(5)
-                    member_dict = get_master_members(aws_region, master_detector_id)
-            else:
-                print('Account {monitored} is already a member of {master} in region {region}'.format(
-                    monitored=account, master=master_aws_account_number, region=aws_region
-                ))
-
-            # Multiple logic decisions based on status
-            # this looks odd because I used a key:value pair of AccountId:RelationshipStatus
-            if member_dict[account] == 'Enabled':
-                # Member is enabled and already being monitored
-                print('Account {account} is already enabled'.format(account=account))
-            else:
-                while member_dict[account] != 'Enabled':
-                    if member_dict[account] == 'Created':
-                        # Member has been created in the GuardDuty master account but not invited yet
-                        invite_members(aws_region, account, master_detector_id)
-
-                    if member_dict[account] == 'Invited':
-                        # member has been invited so accept the invite
-                        invitation_dict = get_invitation_id(gd_client, account)
-                        invitation_id = invitation_dict[account]
-                        accept_invitation(gd_client, invitation_id, detector_id)
-
-                    # Refresh the member dictionary
-                    member_dict = get_master_members(aws_region, master_detector_id)
-                    print('Finished {account} in {region}'.format(account=account, region=aws_region))
+        # If detector does not exist, create it
+        if detector_id:
+            # a detector exists
+            print('Found existing detector {detector} in {region} for {account}'.format(
+                detector=detector_id, region=aws_region, account=account
+            ))
         else:
-            print('Region is eu-west-3.  Skipping region.')
+            # create a detector
+            detector_str = create_detector(gd_client)
+            print('Created detector {detector} in {region} for {account}'.format(
+                detector=detector_str, region=aws_region, account=account
+            ))
+            detector_id = detector_str
+
+        master_detector_id = master_detector_id_dict[aws_region]
+        member_dict = get_master_members(aws_region, master_detector_id)
+        # If detector is not a member of the GuardDuty master account, add it
+        if account not in member_dict:
+            add_member(account, aws_region, master_detector_id)
+            # not sure this is the best logic
+            # repopulating member_dict now that we added the account as a member otherwise logic below is blown
+            # waiting because it takes some time before the member shows up in the list
+            while account not in member_dict:
+                time.sleep(5)
+                member_dict = get_master_members(aws_region, master_detector_id)
+        else:
+            print('Account {monitored} is already a member of {master} in region {region}'.format(
+                monitored=account, master=master_aws_account_number, region=aws_region
+            ))
+
+        # Multiple logic decisions based on status
+        # this looks odd because I used a key:value pair of AccountId:RelationshipStatus
+        if member_dict[account] == 'Enabled':
+            # Member is enabled and already being monitored
+            print('Account {account} is already enabled'.format(account=account))
+        else:
+            while member_dict[account] != 'Enabled':
+                if member_dict[account] == 'Created':
+                    # Member has been created in the GuardDuty master account but not invited yet
+                    invite_members(aws_region, account, master_detector_id)
+
+                if member_dict[account] == 'Invited':
+                    # member has been invited so accept the invite
+                    invitation_dict = get_invitation_id(gd_client, account)
+                    invitation_id = invitation_dict[account]
+                    accept_invitation(gd_client, invitation_id, detector_id)
+
+                # Refresh the member dictionary
+                member_dict = get_master_members(aws_region, master_detector_id)
+                print('Finished {account} in {region}'.format(account=account, region=aws_region))
 
 
 if __name__ == '__main__':
