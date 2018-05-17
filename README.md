@@ -71,7 +71,8 @@ optional arguments:
   --master_account MASTER_ACCOUNT
                         AccountId for Central AWS Account
   --assume_role ASSUME_ROLE
-                        Role Name to assume in each account```
+                        Role Name to assume in each account
+```
     
 #### 2b. Disable GuardDuty
 * Copy the required CSV file to this directory
