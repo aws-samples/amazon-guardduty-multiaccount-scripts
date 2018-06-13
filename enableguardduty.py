@@ -118,13 +118,13 @@ if __name__ == '__main__':
     
     # Setup command line arguments
     parser = argparse.ArgumentParser(description='Link AWS Accounts to central GuardDuty Account')
-    parser.add_argument('--master_account', type=int, help="AccountId for Central AWS Account")
+    parser.add_argument('--master_account', type=str, help="AccountId for Central AWS Account")
     parser.add_argument('input_file', type=argparse.FileType('r'), help='Path to CSV file in the format of accountId, email, ...')
     parser.add_argument('--assume_role', type=str, default='AWSCloudFormationStackSetExecutionRole', help="Role Name to assume in each account")
     args = parser.parse_args()
     
     # Validate master accountId
-    if not re.match(r'[0-9]{12}',str(args.master_account)):
+    if not re.match(r'[0-9]{12}',args.master_account):
         raise ValueError("Master AccountId is not valid")
     
     # Generate dict with account & email information
