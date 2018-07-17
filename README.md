@@ -33,7 +33,7 @@ Note: Account owners of member accounts will recieve an email for each region re
 }
 ```
 
-If you do not have a common role that includes at least the above permissions you will need to create a role in each member account as well as the master account with at least the above permissions.  When creating the role ensure you use the same role name in every account and select the AmazonGuardDutyFullAccess managed policy.  You can use the EnableGuardDuty.yaml CloudFormation Template to automate this process, as the tempalte creates only global resources it can be created in any region.  
+If you do not have a common role that includes at least the above permissions you will need to create a role in each member account as well as the master account with at least the above permissions.  When creating the role ensure you use the same role name in every account and select the AmazonGuardDutyFullAccess managed policy.  You can use the EnableGuardDuty.yaml CloudFormation Template to automate this process, as the tempalte creates only global resources it can be created in any region.    
 
 * A CSV file that includes the list of accounts to be linked to the master account.  Accounts should be listed one per line in the format of AccountId,EmailAddress.  The EmailAddress must be the email associated with the root account.
 * Master AccountId which will recieve findings for all the linked accounts within the CSV file 
@@ -86,23 +86,22 @@ If you do not have a common role that includes at least the above permissions yo
     * Should be in the formation of "AccountId,EmailAddress" with one AccountID and EmailAddress per line.
 
 ```
-usage: python enableguardduty.py [-h] [--master_account MASTER_ACCOUNT]
-                                 [--assume_role ASSUME_ROLE]
-                                 input_file
+usage: enableguardduty.py [-h] --master_account MASTER_ACCOUNT --assume_role
+                          ASSUME_ROLE
+                          input_file
 
 Link AWS Accounts to central GuardDuty Account
 
 positional arguments:
-  input_file            Path to CSV file in the format of accountId, email
-  
-required arguments:
-  --assume_role ASSUME_ROLE
-                        Role Name to assume in each account
+  input_file            Path to CSV file containing the list of account IDs
+                        and Email addresses
 
 optional arguments:
   -h, --help            show this help message and exit
   --master_account MASTER_ACCOUNT
-                        AccountId for Master AWS Account where findings will be centralized
+                        AccountId for Central AWS Account
+  --assume_role ASSUME_ROLE
+                        Role Name to assume in each account
   
 ```
     
@@ -111,22 +110,21 @@ optional arguments:
     * Should be in the formation of "AccountId,EmailAddress,..."
 
 ```
-usage: disableguardduty.py [-h] [--master_account MASTER_ACCOUNT]
-                           [--assume_role ASSUME_ROLE] [--delete_master]
+usage: disableguardduty.py [-h] --master_account MASTER_ACCOUNT --assume_role
+                           ASSUME_ROLE [--delete_master]
                            input_file
 
 Link AWS Accounts to central GuardDuty Account
 
 positional arguments:
-  input_file            Path to CSV file in the format of accountId, email,
-                        ...
-required arguments:
-  --assume_role ASSUME_ROLE
-                        Role Name to assume in each account
+  input_file            Path to CSV file containing the list of account IDs
+                        and Email addresses
 
 optional arguments:
   -h, --help            show this help message and exit
   --master_account MASTER_ACCOUNT
-                        AccountId for Master AWS Accouns
+                        AccountId for Central AWS Account
+  --assume_role ASSUME_ROLE
+                        Role Name to assume in each account
   --delete_master       Delete the master Gd Detector
 ```
