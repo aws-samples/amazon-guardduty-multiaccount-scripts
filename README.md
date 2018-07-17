@@ -35,7 +35,7 @@ Note: Account owners of member accounts will recieve an email for each region re
 
 If you do not have a common role that includes at least the above permissions you will need to create a role in each member account as well as the master account with at least the above permissions.  When creating the role ensure you use the same role name in every account and select the AmazonGuardDutyFullAccess managed policy.  You can use the EnableGuardDuty.yaml CloudFormation Template to automate this process, as the tempalte creates only global resources it can be created in any region.  
 
-* A CSV file that includes the list of accounts to be linked to the master account.  Accounts should be listed one per line in the format of AccountId,EmailAddress
+* A CSV file that includes the list of accounts to be linked to the master account.  Accounts should be listed one per line in the format of AccountId,EmailAddress.  The EmailAddress must be the email associated with the root account.
 * Master AccountId which will recieve findings for all the linked accounts within the CSV file 
 
 ## Steps
