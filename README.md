@@ -50,10 +50,24 @@ enableguardduty.py will enable GuardDuty, send invitations from the master accou
         * git clone https://github.com/aws-samples/amazon-guardduty-multiaccount-scripts
         * cd amazon-guardduty-multiaccount-scripts
 
-### 2. Execute Scripts
-#### 2a. Enable GuardDuty
-* Copy the required CSV file to this directory
-    * Should be in the formation of "AccountId,EmailAddress,..."
+### 2. Create the account list
+* Account list is a text file in CSV format
+    * CSV fields are separated by comma
+    * Don't include the header line
+    * Required fields are:
+        * AWS account ID - 12 digit number including leading zero(s)
+        * AWS account main email address (root user)
+    * Additional fields will be ignored
+    * Don't include the master account in the list
+
+Example file:
+```
+123456789012,some-aws-account@acme.org
+112233445566,john@doe.com
+```
+
+### 3. Execute Scripts
+#### 3a. Enable GuardDuty
 
 ```
 usage: python enableguardduty.py [-h] [--master_account MASTER_ACCOUNT]
@@ -63,7 +77,7 @@ usage: python enableguardduty.py [-h] [--master_account MASTER_ACCOUNT]
 Link AWS Accounts to central GuardDuty Account
 
 positional arguments:
-  input_file            Path to CSV file in the format of accountId, email,
+  input_file            Path to CSV file in the format of accountId,email,
                         ...
 
 optional arguments:
@@ -74,9 +88,7 @@ optional arguments:
                         Role Name to assume in each account
 ```
     
-#### 2b. Disable GuardDuty
-* Copy the required CSV file to this directory
-    * Should be in the formation of "AccountId,EmailAddress,..."
+#### 3b. Disable GuardDuty
 
 ```
 usage: disableguardduty.py [-h] [--master_account MASTER_ACCOUNT]
@@ -86,7 +98,7 @@ usage: disableguardduty.py [-h] [--master_account MASTER_ACCOUNT]
 Link AWS Accounts to central GuardDuty Account
 
 positional arguments:
-  input_file            Path to CSV file in the format of accountId, email,
+  input_file            Path to CSV file in the format of accountId,email,
                         ...
 
 optional arguments:
