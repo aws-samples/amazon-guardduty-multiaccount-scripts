@@ -153,10 +153,10 @@ if __name__ == '__main__':
     guardduty_regions = []
     if args.enabled_regions:
         guardduty_regions = [str(item) for item in args.enabled_regions.split(',')]
-        print("Enabling detectors in these regions: {}".format(guardduty_regions))
+        print("Enabling members in these regions: {}".format(guardduty_regions))
     else:
         guardduty_regions = session.get_available_regions('guardduty')
-        print("Enabling detectors in all available GuardDuty regions {}".format(guardduty_regions))
+        print("Enabling members in all available GuardDuty regions {}".format(guardduty_regions))
     
     # Setting the invitationmessage
     gd_invite_message = 'Account {account} invites you to join GuardDuty.'.format(account=args.master_account)
