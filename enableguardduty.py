@@ -121,8 +121,9 @@ if __name__ == '__main__':
     parser.add_argument('--master_account', type=str, required=True, help="AccountId for Central AWS Account")
     parser.add_argument('input_file', type=argparse.FileType('r'), help='Path to CSV file containing the list of account IDs and Email addresses')
     parser.add_argument('--assume_role', type=str, required=True, help="Role Name to assume in each account")
+    parser.add_argument('--enabled_regions', type=str, help="comma separated list of regions to enable GuardDuty. If not specified, all available regions enabled")
     args = parser.parse_args()
-    
+
     # Validate master accountId
     if not re.match(r'[0-9]{12}',args.master_account):
         raise ValueError("Master AccountId is not valid")
@@ -148,7 +149,14 @@ if __name__ == '__main__':
     
     # Getting GuardDuty regions
     session = boto3.session.Session()
-    guardduty_regions = session.get_available_regions('guardduty')
+
+    guardduty_regions = []
+    if args.enabled_regions:
+        guardduty_regions = [str(item) for item in args.enabled_regions.split(',')]
+        print("Enabling members in these regions: {}".format(guardduty_regions))
+    else:
+        guardduty_regions = session.get_available_regions('guardduty')
+        print("Enabling members in all available GuardDuty regions {}".format(guardduty_regions))
     
     # Setting the invitationmessage
     gd_invite_message = 'Account {account} invites you to join GuardDuty.'.format(account=args.master_account)

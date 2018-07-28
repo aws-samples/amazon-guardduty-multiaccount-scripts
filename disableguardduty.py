@@ -106,6 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('input_file', type=argparse.FileType('r'), help='Path to CSV file containing the list of account IDs and Email addresses')
     parser.add_argument('--assume_role', type=str, required=True, help="Role Name to assume in each account")
     parser.add_argument('--delete_master', action='store_true', default=False, help="Delete the master Gd Detector")
+    parser.add_argument('--enabled_regions', type=str, help="comma separated list of regions to remove GuardDuty. If not specified, all available regions disabled")
     args = parser.parse_args()
     
     # Validate master accountId
@@ -130,7 +131,14 @@ if __name__ == '__main__':
     
     # Getting GuardDuty regions
     session = boto3.session.Session()
-    guardduty_regions = session.get_available_regions('guardduty')
+    guardduty_regions = []
+    if args.enabled_regions:
+        guardduty_regions = [str(item) for item in args.enabled_regions.split(',')]
+        print("Disabling members in these regions: {}".format(guardduty_regions))
+    else:
+        guardduty_regions = session.get_available_regions('guardduty')
+        print("Disabling members in all available GuardDuty regions {}".format(guardduty_regions))
+    
     
     master_session = assume_role(args.master_account, args.assume_role)
             
