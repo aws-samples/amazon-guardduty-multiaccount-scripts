@@ -274,6 +274,17 @@ if __name__ == '__main__':
                     # Member is enabled and already being monitored
                     print('Account {account} is already enabled'.format(account=account))
                     
+                    # Member is part but disabled
+                    if member_dict[account] == 'Disabled':
+                    print('Account {account} Error: Disabled'.format(account=account))
+                        master_gd_client.start_monitoring_members(
+                            AccountIds=[
+                                account
+                            ],
+                            DetectorId=master_detector_id
+                        )
+                    print('Account {account} Re-Enabled'.format(account=account))
+                     
                 else:
                     master_gd_client = master_session.client('guardduty', region_name=aws_region)
                     gd_client = session.client('guardduty', region_name=aws_region)
