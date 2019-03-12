@@ -275,15 +275,15 @@ if __name__ == '__main__':
                 if member_dict[account] == 'EmailVerificationFailed':
                     # Member is enabled and already being monitored
                     print('Account {account} Error: EmailVerificationFailed'.format(account=account))
-
-                    master_gd_client.disassociate_members(
+                    gd_client = master_session.client('guardduty', region_name=aws_region)
+                    gd_client.disassociate_members(
                         AccountIds=[
                             account
                         ],
                         DetectorId=master_detector_id
                     )
 
-                    master_gd_client.delete_members(
+                    gd_client.delete_members(
                         AccountIds=[
                             account
                         ],
