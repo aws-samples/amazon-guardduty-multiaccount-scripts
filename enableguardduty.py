@@ -399,8 +399,10 @@ if __name__ == '__main__':
         print("Failed Accounts")
         print("---------------------------------------------------------------")
         for account in failed_accounts:
-            print("{}: \n\t{}".format(
-                account.keys()[0],
-                account[account.keys()[0]]
-            ))
+            for id in account:
+
+                print("{}: \n\t{}".format(
+                id,
+                account[id]
+                ))
             print("---------------------------------------------------------------")
