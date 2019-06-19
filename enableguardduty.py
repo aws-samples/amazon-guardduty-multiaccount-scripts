@@ -400,7 +400,6 @@ if __name__ == '__main__':
         print("---------------------------------------------------------------")
         for account in failed_accounts:
             for id in account:
-
                 print("{}: \n\t{}".format(
                 id,
                 account[id]
