@@ -160,24 +160,24 @@ if __name__ == '__main__':
                 if args.delete_master:
                     
                     response = gd_client.disassociate_members(
-                        AccountIds=member_dict.keys(),
+                        AccountIds=list(member_dict.keys()),
                         DetectorId=detector_id
                     )
                     
                     response = gd_client.delete_members(
                         DetectorId=detector_id,
-                        AccountIds=member_dict.keys()
+                        AccountIds=list(member_dict.keys())
                     )
                     
                 else:
                     response = gd_client.disassociate_members(
-                        AccountIds=aws_account_dict.keys(),
+                        AccountIds=list(aws_account_dict.keys()),
                         DetectorId=detector_id
                     )
                     
                     response = gd_client.delete_members(
                         DetectorId=detector_id,
-                        AccountIds=aws_account_dict.keys()
+                        AccountIds=list(aws_account_dict.keys())
                     )
                 
                 print('Deleting members for {account} in {region}'.format(
