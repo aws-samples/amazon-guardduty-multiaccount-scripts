@@ -21,20 +21,21 @@ It invites and accepts the invite for each Member account.
 """
 
 import boto3
-import sys
 import time
 import argparse
 import re
+import getpass
 
 from collections import OrderedDict
 from botocore.exceptions import ClientError
 
-def assume_role(aws_account_number, role_name):
+
+def assume_role(aws_account_number, role_name, mfa_serial):
     """
     Assumes the provided role in each account and returns a GuardDuty client
     :param aws_account_number: AWS Account Number
     :param role_name: Role to assume in target account
-    :param aws_region: AWS Region for the Client call, not required for IAM calls
+    :param mfa_serial: The identification number of the MFA device that is associated with the user who is making the AssumeRole call
     :return: GuardDuty client in the specified AWS Account and Region
     """
 
@@ -44,14 +45,20 @@ def assume_role(aws_account_number, role_name):
     # Get the current partition
     partition = sts_client.get_caller_identity()['Arn'].split(":")[1]
 
-    response = sts_client.assume_role(
-        RoleArn='arn:{}:iam::{}:role/{}'.format(
+    assume_role_args = {
+        'RoleArn': 'arn:{}:iam::{}:role/{}'.format(
             partition,
             aws_account_number,
             role_name
         ),
-        RoleSessionName='EnableGuardDuty'
-    )
+        'RoleSessionName': 'EnableGuardDuty',
+    }
+
+    if mfa_serial:
+        assume_role_args['SerialNumber'] = mfa_serial
+        assume_role_args['TokenCode'] = getpass.getpass(prompt='MFA token code: ')
+
+    response = sts_client.assume_role(**assume_role_args)
 
     # Storing STS credentials
     session = boto3.Session(
@@ -65,6 +72,7 @@ def assume_role(aws_account_number, role_name):
     ))
 
     return session
+
 
 def get_master_members(master_session, aws_region, detector_id):
     """
@@ -94,6 +102,7 @@ def get_master_members(master_session, aws_region, detector_id):
 
     return member_dict
 
+
 def list_detectors(client, aws_region):
     """
     Lists the detectors in a given Account/Region
@@ -114,6 +123,7 @@ def list_detectors(client, aws_region):
 
     return detector_dict
 
+
 if __name__ == '__main__':
 
     # Setup command line arguments
@@ -121,11 +131,12 @@ if __name__ == '__main__':
     parser.add_argument('--master_account', type=str, required=True, help="AccountId for Central AWS Account")
     parser.add_argument('input_file', type=argparse.FileType('r'), help='Path to CSV file containing the list of account IDs and Email addresses')
     parser.add_argument('--assume_role', type=str, required=True, help="Role Name to assume in each account")
+    parser.add_argument('--mfa-serial', type=str, help='The identification number of the MFA device that is associated with the user who is making the AssumeRole call')
     parser.add_argument('--enabled_regions', type=str, help="comma separated list of regions to enable GuardDuty. If not specified, all available regions enabled")
     args = parser.parse_args()
 
     # Validate master accountId
-    if not re.match(r'[0-9]{12}',args.master_account):
+    if not re.match(r'[0-9]{12}', args.master_account):
         raise ValueError("Master AccountId is not valid")
 
     # Generate dict with account & email information
@@ -164,7 +175,7 @@ if __name__ == '__main__':
     master_detector_id_dict = dict()
 
     # Processing Master account
-    master_session = assume_role(args.master_account, args.assume_role)
+    master_session = assume_role(args.master_account, args.assume_role, args.mfa_serial)
     for aws_region in guardduty_regions:
 
         gd_client = master_session.client('guardduty', region_name=aws_region)
@@ -197,7 +208,7 @@ if __name__ == '__main__':
     failed_accounts = []
     for account in aws_account_dict.keys():
         try:
-            session = assume_role(account, args.assume_role)
+            session = assume_role(account, args.assume_role, args.mfa_serial)
 
             for aws_region in guardduty_regions:
                 print('Beginning {account} in {region}'.format(
