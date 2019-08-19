@@ -162,36 +162,44 @@ if __name__ == '__main__':
     gd_invite_message = 'Account {account} invites you to join GuardDuty.'.format(account=args.master_account)
 
     master_detector_id_dict = dict()
-
+    failed_master_regions = []
     # Processing Master account
     master_session = assume_role(args.master_account, args.assume_role)
     for aws_region in guardduty_regions:
+        try: 
+            gd_client = master_session.client('guardduty', region_name=aws_region)
 
-        gd_client = master_session.client('guardduty', region_name=aws_region)
+            detector_dict = list_detectors(gd_client, aws_region)
 
-        detector_dict = list_detectors(gd_client, aws_region)
+            if detector_dict[aws_region]:
+                # a detector exists
+                print('Found existing detector {detector} in {region} for {account}'.format(
+                    detector=detector_dict[aws_region],
+                    region=aws_region,
+                    account=args.master_account
+                ))
 
-        if detector_dict[aws_region]:
-            # a detector exists
-            print('Found existing detector {detector} in {region} for {account}'.format(
-                detector=detector_dict[aws_region],
-                region=aws_region,
-                account=args.master_account
-            ))
+                master_detector_id_dict.update({aws_region: detector_dict[aws_region]})
 
-            master_detector_id_dict.update({aws_region: detector_dict[aws_region]})
+            else:
 
-        else:
+                # create a detector
+                detector_str = gd_client.create_detector(Enable=True)['DetectorId']
+                print('Created detector {detector} in {region} for {account}'.format(
+                    detector=detector_str,
+                    region=aws_region,
+                    account=args.master_account
+                ))
 
-            # create a detector
-            detector_str = gd_client.create_detector(Enable=True)['DetectorId']
-            print('Created detector {detector} in {region} for {account}'.format(
-                detector=detector_str,
-                region=aws_region,
-                account=args.master_account
-            ))
+                master_detector_id_dict.update({aws_region: detector_str})
+        except ClientError as err:
+            if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
+                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue").format(aws_region,aws_region)
+                failed_master_regions.append(aws_region)
 
-            master_detector_id_dict.update({aws_region: detector_str})
+    for failed_region in failed_master_regions:
+        guardduty_regions.remove(failed_region)            
+           
 
     # Processing accounts to be linked
     failed_accounts = []
