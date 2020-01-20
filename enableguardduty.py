@@ -166,7 +166,7 @@ if __name__ == '__main__':
     # Processing Master account
     master_session = assume_role(args.master_account, args.assume_role)
     for aws_region in guardduty_regions:
-        try: 
+        try:
             gd_client = master_session.client('guardduty', region_name=aws_region)
 
             detector_dict = list_detectors(gd_client, aws_region)
@@ -194,12 +194,12 @@ if __name__ == '__main__':
                 master_detector_id_dict.update({aws_region: detector_str})
         except ClientError as err:
             if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
-                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue").format(aws_region,aws_region)
+                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue".format(aws_region,aws_region))
                 failed_master_regions.append(aws_region)
 
     for failed_region in failed_master_regions:
-        guardduty_regions.remove(failed_region)            
-           
+        guardduty_regions.remove(failed_region)
+
 
     # Processing accounts to be linked
     failed_accounts = []
