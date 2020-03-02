@@ -29,6 +29,7 @@ import re
 from collections import OrderedDict
 from botocore.exceptions import ClientError
 
+
 def assume_role(aws_account_number, role_name):
     """
     Assumes the provided role in each account and returns a GuardDuty client
@@ -66,6 +67,7 @@ def assume_role(aws_account_number, role_name):
 
     return session
 
+
 def get_master_members(master_session, aws_region, detector_id):
     """
     Returns a list of current members of the GuardDuty master account
@@ -94,6 +96,7 @@ def get_master_members(master_session, aws_region, detector_id):
 
     return member_dict
 
+
 def list_detectors(client, aws_region):
     """
     Lists the detectors in a given Account/Region
@@ -114,6 +117,7 @@ def list_detectors(client, aws_region):
 
     return detector_dict
 
+
 if __name__ == '__main__':
 
     # Setup command line arguments
@@ -125,7 +129,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Validate master accountId
-    if not re.match(r'[0-9]{12}',args.master_account):
+    if not re.match(r'[0-9]{12}', args.master_account):
         raise ValueError("Master AccountId is not valid")
 
     # Generate dict with account & email information
@@ -166,7 +170,7 @@ if __name__ == '__main__':
     # Processing Master account
     master_session = assume_role(args.master_account, args.assume_role)
     for aws_region in guardduty_regions:
-        try: 
+        try:
             gd_client = master_session.client('guardduty', region_name=aws_region)
 
             detector_dict = list_detectors(gd_client, aws_region)
@@ -194,12 +198,11 @@ if __name__ == '__main__':
                 master_detector_id_dict.update({aws_region: detector_str})
         except ClientError as err:
             if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
-                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue").format(aws_region,aws_region)
+                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue").format(aws_region, aws_region)
                 failed_master_regions.append(aws_region)
 
     for failed_region in failed_master_regions:
-        guardduty_regions.remove(failed_region)            
-           
+        guardduty_regions.remove(failed_region)
 
     # Processing accounts to be linked
     failed_accounts = []
@@ -208,193 +211,196 @@ if __name__ == '__main__':
             session = assume_role(account, args.assume_role)
 
             for aws_region in guardduty_regions:
-                print('Beginning {account} in {region}'.format(
-                    account=account,
-                    region=aws_region
-                ))
-
-                gd_client = session.client('guardduty', region_name=aws_region)
-
-                # get detectors for this region
-                detector_dict = list_detectors(gd_client, aws_region)
-                detector_id = detector_dict[aws_region]
-
-                # If detector does not exist, create it
-                if detector_id:
-                    # a detector exists
-                    print('Found existing detector {detector} in {region} for {account}'.format(
-                        detector=detector_id,
-                        region=aws_region,
-                        account=account
-                    ))
-
-                else:
-                    # create a detector
-                    detector_str = gd_client.create_detector(Enable=True)['DetectorId']
-                    print('Created detector {detector} in {region} for {account}'.format(
-                        detector=detector_str,
-                        region=aws_region,
-                        account=account
-                    ))
-
-                    detector_id = detector_str
-
-                master_detector_id = master_detector_id_dict[aws_region]
-                member_dict = get_master_members(master_session, aws_region, master_detector_id)
-
-                # If detector is not a member of the GuardDuty master account, add it
-                if account not in member_dict:
-                    gd_client = master_session.client('guardduty', region_name=aws_region)
-
-                    gd_client.create_members(
-                        AccountDetails=[
-                            {
-                                'AccountId': account,
-                                'Email': aws_account_dict[account]
-                            }
-                        ],
-                        DetectorId=master_detector_id
-                    )
-
-                    print('Added Account {monitored} to member list in GuardDuty master account {master} for region {region}'.format(
-                        monitored=account,
-                        master=args.master_account,
-                        region=aws_region
-                    ))
-
-                    start_time = int(time.time())
-                    while account not in member_dict:
-                        if (int(time.time()) - start_time) > 300:
-                            print("Membership did not show up for account {}, skipping".format(account))
-                            break
-
-                        time.sleep(5)
-                        member_dict = get_master_members(master_session, aws_region, master_detector_id)
-
-                else:
-
-                    print('Account {monitored} is already a member of {master} in region {region}'.format(
-                        monitored=account,
-                        master=args.master_account,
-                        region=aws_region
-                    ))
-
-                # Check if Verification Was failed before, delete and add it again.
-                if member_dict[account] == 'EmailVerificationFailed':
-                    # Member is enabled and already being monitored
-                    print('Account {account} Error: EmailVerificationFailed'.format(account=account))
-                    gd_client = master_session.client('guardduty', region_name=aws_region)
-                    gd_client.disassociate_members(
-                        AccountIds=[
-                            account
-                        ],
-                        DetectorId=master_detector_id
-                    )
-
-                    gd_client.delete_members(
-                        AccountIds=[
-                            account
-                        ],
-                        DetectorId=master_detector_id
-                    )
-
-                    print('Deleting members for {account} in {region}'.format(
+                try:
+                    print('Beginning {account} in {region}'.format(
                         account=account,
                         region=aws_region
                     ))
 
-                    gd_client.create_members(
-                        AccountDetails=[
-                            {
-                                'AccountId': account,
-                                'Email': aws_account_dict[account]
-                            }
-                        ],
-                        DetectorId=master_detector_id
-                    )
-
-                    print('Added Account {monitored} to member list in GuardDuty master account {master} for region {region}'.format(
-                        monitored=account,
-                        master=args.master_account,
-                        region=aws_region
-                    ))
-
-                    start_time = int(time.time())
-                    while account not in member_dict:
-                        if (int(time.time()) - start_time) > 300:
-                            print("Membership did not show up for account {}, skipping".format(account))
-                            break
-
-                        time.sleep(5)
-                        member_dict = get_master_members(master_session, aws_region, master_detector_id)
-
-
-                if member_dict[account] == 'Enabled':
-                    # Member is enabled and already being monitored
-                    print('Account {account} is already enabled'.format(account=account))
-
-                else:
-                    master_gd_client = master_session.client('guardduty', region_name=aws_region)
                     gd_client = session.client('guardduty', region_name=aws_region)
 
-                    if member_dict[account] == 'Disabled' :
-                        # Member was disabled
-                        print('Account {account} Error: Disabled'.format(account=account))
-                        master_gd_client.start_monitoring_members(
+                    # get detectors for this region
+                    detector_dict = list_detectors(gd_client, aws_region)
+                    detector_id = detector_dict[aws_region]
+
+                    # If detector does not exist, create it
+                    if detector_id:
+                        # a detector exists
+                        print('Found existing detector {detector} in {region} for {account}'.format(
+                            detector=detector_id,
+                            region=aws_region,
+                            account=account
+                        ))
+
+                    else:
+                        # create a detector
+                        detector_str = gd_client.create_detector(Enable=True)['DetectorId']
+                        print('Created detector {detector} in {region} for {account}'.format(
+                            detector=detector_str,
+                            region=aws_region,
+                            account=account
+                        ))
+
+                        detector_id = detector_str
+
+                    master_detector_id = master_detector_id_dict[aws_region]
+                    member_dict = get_master_members(master_session, aws_region, master_detector_id)
+
+                    # If detector is not a member of the GuardDuty master account, add it
+                    if account not in member_dict:
+                        gd_client = master_session.client('guardduty', region_name=aws_region)
+
+                        gd_client.create_members(
+                            AccountDetails=[
+                                {
+                                    'AccountId': account,
+                                    'Email': aws_account_dict[account]
+                                }
+                            ],
+                            DetectorId=master_detector_id
+                        )
+
+                        print('Added Account {monitored} to member list in GuardDuty master account {master} for region {region}'.format(
+                            monitored=account,
+                            master=args.master_account,
+                            region=aws_region
+                        ))
+
+                        start_time = int(time.time())
+                        while account not in member_dict:
+                            if (int(time.time()) - start_time) > 300:
+                                print("Membership did not show up for account {}, skipping".format(account))
+                                break
+
+                            time.sleep(5)
+                            member_dict = get_master_members(master_session, aws_region, master_detector_id)
+
+                    else:
+
+                        print('Account {monitored} is already a member of {master} in region {region}'.format(
+                            monitored=account,
+                            master=args.master_account,
+                            region=aws_region
+                        ))
+
+                    # Check if Verification Was failed before, delete and add it again.
+                    if member_dict[account] == 'EmailVerificationFailed':
+                        # Member is enabled and already being monitored
+                        print('Account {account} Error: EmailVerificationFailed'.format(account=account))
+                        gd_client = master_session.client('guardduty', region_name=aws_region)
+                        gd_client.disassociate_members(
                             AccountIds=[
                                 account
                             ],
                             DetectorId=master_detector_id
                         )
-                        print('Account {account} Re-Enabled'.format(account=account))
 
-                    while member_dict[account] != 'Enabled':
+                        gd_client.delete_members(
+                            AccountIds=[
+                                account
+                            ],
+                            DetectorId=master_detector_id
+                        )
 
-                        if member_dict[account] == 'Created' :
-                            # Member has been created in the GuardDuty master account but not invited yet
-                            master_gd_client = master_session.client('guardduty', region_name=aws_region)
+                        print('Deleting members for {account} in {region}'.format(
+                            account=account,
+                            region=aws_region
+                        ))
 
-                            master_gd_client.invite_members(
+                        gd_client.create_members(
+                            AccountDetails=[
+                                {
+                                    'AccountId': account,
+                                    'Email': aws_account_dict[account]
+                                }
+                            ],
+                            DetectorId=master_detector_id
+                        )
+
+                        print('Added Account {monitored} to member list in GuardDuty master account {master} for region {region}'.format(
+                            monitored=account,
+                            master=args.master_account,
+                            region=aws_region
+                        ))
+
+                        start_time = int(time.time())
+                        while account not in member_dict:
+                            if (int(time.time()) - start_time) > 300:
+                                print("Membership did not show up for account {}, skipping".format(account))
+                                break
+
+                            time.sleep(5)
+                            member_dict = get_master_members(master_session, aws_region, master_detector_id)
+
+                    if member_dict[account] == 'Enabled':
+                        # Member is enabled and already being monitored
+                        print('Account {account} is already enabled'.format(account=account))
+
+                    else:
+                        master_gd_client = master_session.client('guardduty', region_name=aws_region)
+                        gd_client = session.client('guardduty', region_name=aws_region)
+
+                        if member_dict[account] == 'Disabled':
+                            # Member was disabled
+                            print('Account {account} Error: Disabled'.format(account=account))
+                            master_gd_client.start_monitoring_members(
                                 AccountIds=[
                                     account
                                 ],
-                                DetectorId=master_detector_id,
-                                Message=gd_invite_message
+                                DetectorId=master_detector_id
                             )
+                            print('Account {account} Re-Enabled'.format(account=account))
 
-                            print('Invited Account {monitored} to GuardDuty master account {master} in region {region}'.format(
-                                monitored=account,
-                                master=args.master_account,
-                                region=aws_region
-                            ))
+                        while member_dict[account] != 'Enabled':
 
-                        if member_dict[account] == 'Invited' or member_dict[account] == 'Resigned' :
-                            # member has been invited so accept the invite
+                            if member_dict[account] == 'Created':
+                                # Member has been created in the GuardDuty master account but not invited yet
+                                master_gd_client = master_session.client('guardduty', region_name=aws_region)
 
-                            response = gd_client.list_invitations()
-
-                            invitation_dict = dict()
-
-                            invitation_id = None
-                            for invitation in response['Invitations']:
-                                invitation_id = invitation['InvitationId']
-
-                            if invitation_id is not None:
-                                gd_client.accept_invitation(
-                                    DetectorId=detector_id,
-                                    InvitationId=invitation_id,
-                                    MasterId=str(args.master_account)
+                                master_gd_client.invite_members(
+                                    AccountIds=[
+                                        account
+                                    ],
+                                    DetectorId=master_detector_id,
+                                    Message=gd_invite_message
                                 )
-                                print('Accepting Account {monitored} to GuardDuty master account {master} in region {region}'.format(
+
+                                print('Invited Account {monitored} to GuardDuty master account {master} in region {region}'.format(
                                     monitored=account,
                                     master=args.master_account,
                                     region=aws_region
                                 ))
 
-                        # Refresh the member dictionary
-                        member_dict = get_master_members(master_session, aws_region, master_detector_id)
+                            if member_dict[account] == 'Invited' or member_dict[account] == 'Resigned':
+                                # member has been invited so accept the invite
 
-                    print('Finished {account} in {region}'.format(account=account, region=aws_region))
+                                response = gd_client.list_invitations()
+
+                                invitation_dict = dict()
+
+                                invitation_id = None
+                                for invitation in response['Invitations']:
+                                    invitation_id = invitation['InvitationId']
+
+                                if invitation_id is not None:
+                                    gd_client.accept_invitation(
+                                        DetectorId=detector_id,
+                                        InvitationId=invitation_id,
+                                        MasterId=str(args.master_account)
+                                    )
+                                    print('Accepting Account {monitored} to GuardDuty master account {master} in region {region}'.format(
+                                        monitored=account,
+                                        master=args.master_account,
+                                        region=aws_region
+                                    ))
+
+                            # Refresh the member dictionary
+                            member_dict = get_master_members(master_session, aws_region, master_detector_id)
+
+                        print('Finished {account} in {region}'.format(account=account, region=aws_region))
+                except ClientError as err:
+                    if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
+                        print("Failed to list detectors in Target account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the target account.  Skipping {} and attempting to continue").format(aws_region, aws_region)
 
         except ClientError as e:
             print("Error Processing Account {}".format(account))
