@@ -198,7 +198,7 @@ if __name__ == '__main__':
                 master_detector_id_dict.update({aws_region: detector_str})
         except ClientError as err:
             if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
-                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue").format(aws_region, aws_region)
+                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue".format(aws_region, aws_region))
                 failed_master_regions.append(aws_region)
 
     for failed_region in failed_master_regions:
@@ -400,7 +400,7 @@ if __name__ == '__main__':
                         print('Finished {account} in {region}'.format(account=account, region=aws_region))
                 except ClientError as err:
                     if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
-                        print("Failed to list detectors in Target account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the target account.  Skipping {} and attempting to continue").format(aws_region, aws_region)
+                        print("Failed to list detectors in Target account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the target account.  Skipping {} and attempting to continue".format(aws_region, aws_region))
 
         except ClientError as e:
             print("Error Processing Account {}".format(account))
