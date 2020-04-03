@@ -2,18 +2,14 @@
 """
 Copyright 2018 Amazon.com, Inc. or its affiliates.
 All Rights Reserved.
-
 Licensed under the Apache License, Version 2.0 (the "License").
 You may not use this file except in compliance with the License.
 A copy of the License is located at
-
    http://aws.amazon.com/apache2.0/
-
 or in the "license" file accompanying this file.
 This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
-
 This script orchestrates the disabling of GuardDuty across an enterprise of AWS accounts.
 It takes in a list of AWS Account Numbers, iterates through each account and region to disable GuardDuty.
 It removes each account as a Member in the GuardDuty Master account.
@@ -139,61 +135,70 @@ if __name__ == '__main__':
         guardduty_regions = session.get_available_regions('guardduty')
         print("Disabling members in all available GuardDuty regions {}".format(guardduty_regions))
     
-    
+    failed_master_regions = []
     master_session = assume_role(args.master_account, args.assume_role)
             
     for aws_region in guardduty_regions:
-        gd_client = master_session.client('guardduty', region_name=aws_region)
+        try:
+            gd_client = master_session.client('guardduty', region_name=aws_region)
 
-        detector_dict = list_detectors(gd_client, aws_region)
+            detector_dict = list_detectors(gd_client, aws_region)
 
-        detector_id = detector_dict[aws_region]
+            detector_id = detector_dict[aws_region]
 
-        if detector_id != '':
-            print('GuardDuty is active in {region}'.format(region=aws_region))
+            if detector_id != '':
+                print('GuardDuty is active in {region}'.format(region=aws_region))
 
-        if detector_id != '':
-            member_dict = list_members(gd_client, detector_id)
+            if detector_id != '':
+                member_dict = list_members(gd_client, detector_id)
             
-            if member_dict:
-                print('There are members in {region}'.format(region=aws_region))
-                if args.delete_master:
+                if member_dict:
+                    print('There are members in {region}'.format(region=aws_region))
+                    if args.delete_master:
                     
-                    response = gd_client.disassociate_members(
-                        AccountIds=list(member_dict.keys()),
-                        DetectorId=detector_id
-                    )
+                        response = gd_client.disassociate_members(
+                            AccountIds=list(member_dict.keys()),
+                            DetectorId=detector_id
+                        )
                     
-                    response = gd_client.delete_members(
-                        DetectorId=detector_id,
-                        AccountIds=list(member_dict.keys())
-                    )
+                        response = gd_client.delete_members(
+                            DetectorId=detector_id,
+                            AccountIds=list(member_dict.keys())
+                        )
                     
-                else:
-                    response = gd_client.disassociate_members(
-                        AccountIds=list(aws_account_dict.keys()),
-                        DetectorId=detector_id
-                    )
+                    else:
+                        response = gd_client.disassociate_members(
+                            AccountIds=list(aws_account_dict.keys()),
+                            DetectorId=detector_id
+                        )
                     
-                    response = gd_client.delete_members(
-                        DetectorId=detector_id,
-                        AccountIds=list(aws_account_dict.keys())
-                    )
+                        response = gd_client.delete_members(
+                            DetectorId=detector_id,
+                            AccountIds=list(aws_account_dict.keys())
+                        )
                 
-                print('Deleting members for {account} in {region}'.format(
+                    print('Deleting members for {account} in {region}'.format(
+                        account=args.master_account,
+                        region=aws_region
+                    ))
+    
+                if args.delete_master:
+                    response = gd_client.delete_detector(
+                        DetectorId=detector_id
+                    )
+            else:
+                print('No detector found for {account} in {region}'.format(
                     account=args.master_account,
                     region=aws_region
                 ))
-    
-            if args.delete_master:
-                response = gd_client.delete_detector(
-                    DetectorId=detector_id
-                )
-        else:
-            print('No detector found for {account} in {region}'.format(
-                account=args.master_account,
-                region=aws_region
-            ))
+        except ClientError as err:
+            if err.response['ResponseMetadata']['HTTPStatusCode'] == 403:
+                print("Failed to list detectors in Master account for region: {} due to an authentication error.  Either your credentials are not correctly configured or the region is an OptIn region that is not enabled on the master account.  Skipping {} and attempting to continue".format(aws_region, aws_region))
+                failed_master_regions.append(aws_region) 
+                
+    for failed_region in failed_master_regions:
+        guardduty_regions.remove(failed_region)
+
     failed_accounts = []
     for account_str, account_email in aws_account_dict.items():
         try:
