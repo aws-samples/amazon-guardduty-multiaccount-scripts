@@ -25,9 +25,30 @@ Note: Account owners of member accounts will recieve an email for each region re
             "Resource": "*",
             "Condition": {
                 "StringLike": {
-                    "iam:AWSServiceName": "guardduty.amazonaws.com"
+                    "iam:AWSServiceName": [
+                        "guardduty.amazonaws.com",
+                        "malware-protection.guardduty.amazonaws.com"
+                    ]
                 }
             }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "organizations:EnableAWSServiceAccess",
+                "organizations:RegisterDelegatedAdministrator",
+                "organizations:ListDelegatedAdministrators",
+                "organizations:ListAWSServiceAccessForOrganization",
+                "organizations:DescribeOrganizationalUnit",
+                "organizations:DescribeAccount",
+                "organizations:DescribeOrganization"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "iam:GetRole",
+            "Resource": "arn:aws:iam::*:role/*AWSServiceRoleForAmazonGuardDutyMalwareProtection"
         }
     ]
 }
@@ -127,4 +148,49 @@ optional arguments:
   --assume_role ASSUME_ROLE
                         Role Name to assume in each account
   --delete_master       Delete the master Gd Detector
+```
+
+#### 2b. Change GuardDuty Features
+
+Guardduty has multiple optional detection features that can be edited on a per-account basis. 
+
+`updatefeature.py` allows you to toggle these on and off in bulk. Note that this only works on accounts
+that are already enabled and associated with `enableguardduty.py`. 
+
+For any given feature, `enable_<feature>` will turn it on, `disable_<feature>` will turn it off. If a 
+flag for a `<feature>` is not provided, the previous value will be kept, which can be enabled _or_ disabled.
+
+```
+usage: updatefeature.py [-h] --master_account MASTER_ACCOUNT --assume_role ASSUME_ROLE [--enabled_regions ENABLED_REGIONS] [--enable_malware [ENABLE_MALWARE]] [--enable_eks [ENABLE_EKS]] [--enable_s3 [ENABLE_S3]] [--disable_malware [DISABLE_MALWARE]] [--disable_eks [DISABLE_EKS]]
+                        [--disable_s3 [DISABLE_S3]] [--create_malware_slr [CREATE_MALWARE_SLR]] [--debug]
+                        input_file
+
+Link AWS Accounts to central GuardDuty Account
+
+positional arguments:
+  input_file            Path to CSV file containing the list of account IDs and Email addresses
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --master_account MASTER_ACCOUNT
+                        AccountId for Central AWS Account
+  --assume_role ASSUME_ROLE
+                        Role Name to assume in each account
+  --enabled_regions ENABLED_REGIONS
+                        comma separated list of regions to enable GuardDuty. If not specified, all available regions enabled
+  --enable_malware [ENABLE_MALWARE]
+                        Enables GuardDuty Malware Protection
+  --enable_eks [ENABLE_EKS]
+                        Enables GuardDuty for EKS
+  --enable_s3 [ENABLE_S3]
+                        Enables GuardDuty S3 Protection
+  --disable_malware [DISABLE_MALWARE]
+                        Disable GuardDuty Malware Protection
+  --disable_eks [DISABLE_EKS]
+                        Disable GuardDuty for EKS
+  --disable_s3 [DISABLE_S3]
+                        Disable GuardDuty S3 Protection
+  --create_malware_slr [CREATE_MALWARE_SLR]
+                        Creates the Service Linked Role necessary to run Malware Scans
+  --debug               Turns on more verbose logging
 ```
