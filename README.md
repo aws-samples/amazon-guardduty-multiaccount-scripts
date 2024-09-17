@@ -2,13 +2,16 @@
 
 These scripts automate the process of enabling and disabling Amazon GuardDuty simultaneously across a group of AWS accounts that are in your control. (Note, that you can have one master account and up to a 1000 member accounts).
 
+> [!IMPORTANT]
+> GuardDuty recommends using AWS Organizations instead of GuardDuty invitations to manage your member accounts. These scripts use GuardDuty's legacy invitation method. See https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_accounts.html for more information.
+
 enableguardduty.py will enable GuardDuty, send invitations from the master account and accept invitations in all member accounts. The result will be a master account that contains all security findings for all member accounts. Since GuardDuty is regionally isolated, findings for each member account will roll up to the corresponding region in the master account. For example, the us-east-1 region in your GuardDuty master account will contain the security findings for all us-east-1 findings from all associated member accounts.
 
-Note: Account owners of member accounts will recieve an email for each region requesting that they accept the invitation to link their accounts, these emails can be ignored as the script accepts the inventation on their behalf.
+Note: Account owners of member accounts will receive an email for each region requesting that they accept the invitation to link their accounts, these emails can be ignored as the script accepts the invitation on their behalf.
 
 ## Prerequisites
 
-* The scripts depend on a pre-existing role in the master account and all of the member accounts that will be linked, the role name must be the same in all accounts and the role trust relationship needs to allow your instance or local credentials to assume the role.  The AmazonGuardDutyFullAccess managed poilicy (shown below) contains the required permissions for the script to succeed:
+* The scripts depend on a pre-existing role in the master account and all of the member accounts that will be linked, the role name must be the same in all accounts and the role trust relationship needs to allow your instance or local credentials to assume the role.  The AmazonGuardDutyFullAccess managed policy (shown below) contains the required permissions for the script to succeed:
 
 ``` 
 {
